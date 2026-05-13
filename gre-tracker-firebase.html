@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRE Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --bg2: #f5f5f3; --bg3: #ebebea;
+    --text: #1a1a1a; --text2: #666; --text3: #999;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.2);
+    --radius: 10px; --radius-sm: 7px;
+    --green: #1e6e38; --red: #8b1a1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1c; --bg2: #252525; --bg3: #2e2e2e;
+      --text: #f0f0f0; --text2: #aaa; --text3: #666;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg2); color: var(--text); min-height: 100vh; }
+  .app { max-width: 680px; margin: 0 auto; padding: 16px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .header-left h1 { font-size: 18px; font-weight: 600; }
+  .header-left p { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .sync-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; background: #ccc; }
+  .sync-dot.online { background: #4caf50; }
+  .sync-dot.syncing { background: #ff9800; animation: pulse 1s infinite; }
+  .sync-dot.error { background: #f44336; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .tabs { display: flex; gap: 6px; }
+  .tab { font-size: 13px; padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; }
+  .tab.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; }
+  label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 4px; }
+  input, select, textarea { width: 100%; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text); font-family: inherit; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--text3); }
+  textarea { resize: vertical; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .field { margin-bottom: 10px; }
+  .btn { font-size: 13px; padding: 8px 18px; border-radius: var(--radius-sm); border: 1px solid var(--border2); cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 500; }
+  .btn-ghost { background: transparent; color: var(--text2); }
+  .btn-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  .saved-msg { font-size: 12px; color: #1e7a3c; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid; display: inline-block; }
+  .badge-default { background: var(--bg2); color: var(--text2); border-color: var(--border); }
+  .badge-correct { background: #e6f4ea; color: #1e6e38; border-color: #a8d5b5; }
+  .badge-incorrect { background: #fce8e8; color: #8b1a1a; border-color: #f4a0a0; }
+  .badge-skipped { background: #fef3e2; color: #7a4f00; border-color: #f5c96a; }
+  .badge-review { background: #eaf0fb; color: #1a3a7a; border-color: #a0b8f0; }
+  @media (prefers-color-scheme: dark) {
+    .badge-correct { background: #0d2e18; color: #6fcf97; border-color: #1e6e38; }
+    .badge-incorrect { background: #2e0d0d; color: #f4a0a0; border-color: #8b1a1a; }
+    .badge-skipped { background: #2e2000; color: #f5c96a; border-color: #7a4f00; }
+    .badge-review { background: #0d1a3a; color: #a0b8f0; border-color: #1a3a7a; }
+  }
+  .badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .q-text { font-size: 13px; line-height: 1.6; margin-bottom: 6px; }
+  .q-notes { font-size: 12px; color: var(--text2); font-style: italic; line-height: 1.5; border-left: 2px solid var(--border2); padding-left: 8px; margin-bottom: 4px; }
+  .q-meta { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .q-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .del-btn { font-size: 11px; color: var(--text3); background: none; border: none; cursor: pointer; padding: 2px 4px; flex-shrink: 0; }
+  .log-entry { border-left: 2px solid var(--border2); padding-left: 12px; margin-bottom: 12px; }
+  .log-time { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+  .log-text { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+  .filters { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .filters input { flex: 1; min-width: 130px; }
+  .filters select { width: auto; flex-shrink: 0; }
+  .empty { font-size: 13px; color: var(--text3); text-align: center; padding: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--bg2); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .stat-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .stat-val { font-size: 22px; font-weight: 500; }
+  .section-row { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .hint { font-size: 11px; color: var(--text3); }
+  .loading { font-size: 13px; color: var(--text3); text-align: center; padding: 3rem 0; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: var(--bg); font-size: 13px; padding: 10px 16px; border-radius: var(--radius-sm); opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <h1>GRE Tracker</h1>
+      <p id="header-sub"><span class="sync-dot syncing" id="sync-dot"></span><span id="sync-status">connecting...</span></p>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('log')">log</button>
+      <button class="tab" onclick="switchTab('add')">+ question</button>
+      <button class="tab" onclick="switchTab('stats')">stats</button>
+    </div>
+  </div>
+
+  <!-- LOG TAB -->
+  <div id="tab-log">
+    <div class="card">
+      <label>personal log</label>
+      <textarea id="log-input" rows="2" placeholder="write anything — what clicked, what to verify later, concepts to revisit..."></textarea>
+      <div class="btn-row" style="justify-content:space-between">
+        <span class="hint">ctrl+enter to save</span>
+        <button class="btn btn-ghost" onclick="addLog()">add entry</button>
+      </div>
+    </div>
+    <div id="log-list"><div class="loading">loading...</div></div>
+    <div class="filters">
+      <input type="text" id="search" placeholder="search questions..." oninput="renderQuestions()">
+      <select id="filter-section" onchange="renderQuestions()">
+        <option value="All">All sections</option>
+        <option>Quant</option><option>Verbal</option><option>AWA</option>
+      </select>
+      <select id="filter-status" onchange="renderQuestions()">
+        <option value="All">All status</option>
+        <option>Correct</option><option>Incorrect</option><option>Skipped</option><option>Review Later</option>
+      </select>
+    </div>
+    <div id="q-list"><div class="loading">loading...</div></div>
+  </div>
+
+  <!-- ADD TAB -->
+  <div id="tab-add" style="display:none">
+    <div class="card">
+      <div class="grid2">
+        <div>
+          <label>section</label>
+          <select id="f-section" onchange="updateTopics()">
+            <option>Quant</option><option>Verbal</option><option>AWA</option>
+          </select>
+        </div>
+        <div>
+          <label>topic</label>
+          <select id="f-topic"></select>
+        </div>
+        <div>
+          <label>difficulty</label>
+          <select id="f-diff">
+            <option>Easy</option><option selected>Medium</option><option>Hard</option>
+          </select>
+        </div>
+        <div>
+          <label>status</label>
+          <select id="f-status">
+            <option>Correct</option><option selected>Incorrect</option><option>Skipped</option><option>Review Later</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>question / description *</label>
+        <textarea id="f-qtext" rows="3" placeholder="paste or type the question..."></textarea>
+      </div>
+      <div class="field">
+        <label>your notes / reasoning</label>
+        <textarea id="f-notes" rows="2" placeholder="what went wrong, concept to revisit..."></textarea>
+      </div>
+      <div class="field">
+        <label>source (optional)</label>
+        <input type="text" id="f-source" placeholder="e.g. Manhattan Prep, OG p.214...">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addQuestion()">save question</button>
+        <button class="btn btn-ghost" onclick="clearForm()">clear</button>
+        <span class="saved-msg" id="saved-msg" style="display:none">✓ saved</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS TAB -->
+  <div id="tab-stats" style="display:none">
+    <div class="stat-grid" id="stat-grid"></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px">by section</div>
+    <div id="section-stats"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAJG-J1l71PQwNMbGg6lWStAzf6a0p4xKM",
+  authDomain: "grez-938e4.firebaseapp.com",
+  projectId: "grez-938e4",
+  storageBucket: "grez-938e4.firebasestorage.app",
+  messagingSenderId: "589670459340",
+  appId: "1:589670459340:web:c14d53223c8dde9e909f69",
+  measurementId: "G-3K93CK35BJ"
+};
+
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
+const TOPICS = {
+  Quant: ["Arithmetic","Algebra","Geometry","Data Analysis","Word Problems"],
+  Verbal: ["Reading Comprehension","Text Completion","Sentence Equivalence","Critical Reasoning"],
+  AWA: ["Issue Essay","Argument Essay"]
+};
+const STATUS_CLASS = { "Correct":"correct","Incorrect":"incorrect","Skipped":"skipped","Review Later":"review" };
+
+let questions = [];
+let logs = [];
+
+function fmt(ts) {
+  if (!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString("en-IN", {day:"2-digit",month:"short",year:"numeric"}) + " · " + d.toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit"});
+}
+
+function setSyncStatus(state) {
+  const dot = document.getElementById("sync-dot");
+  const status = document.getElementById("sync-status");
+  dot.className = "sync-dot " + state;
+  if (state === "online") status.textContent = `${questions.length} ques · ${getAccuracy()}% accuracy`;
+  else if (state === "syncing") status.textContent = "syncing...";
+  else status.textContent = "offline — changes saved locally";
+}
+
+function getAccuracy() {
+  const correct = questions.filter(q => q.status === "Correct").length;
+  const incorrect = questions.filter(q => q.status === "Incorrect").length;
+  return (correct+incorrect) > 0 ? Math.round(correct/(correct+incorrect)*100) : 0;
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+function escHtml(s) {
+  if (!s) return "";
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// REALTIME LISTENERS
+const qQuery = query(collection(db, "questions"), orderBy("createdAt", "desc"));
+onSnapshot(qQuery, snap => {
+  questions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  setSyncStatus("online");
+  renderQuestions();
+  if (document.getElementById("tab-stats").style.display !== "none") renderStats();
+}, err => { console.error(err); setSyncStatus("error"); });
+
+const lQuery = query(collection(db, "logs"), orderBy("createdAt", "desc"));
+onSnapshot(lQuery, snap => {
+  logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderLogs();
+}, err => console.error(err));
+
+// QUESTIONS
+window.addQuestion = async function() {
+  const qtext = document.getElementById("f-qtext").value.trim();
+  if (!qtext) return;
+  setSyncStatus("syncing");
+  try {
+    await addDoc(collection(db, "questions"), {
+      section: document.getElementById("f-section").value,
+      topic: document.getElementById("f-topic").value,
+      difficulty: document.getElementById("f-diff").value,
+      status: document.getElementById("f-status").value,
+      questionText: qtext,
+      notes: document.getElementById("f-notes").value.trim(),
+      source: document.getElementById("f-source").value.trim(),
+      createdAt: serverTimestamp()
+    });
+    clearForm();
+    const msg = document.getElementById("saved-msg");
+    msg.style.display = "inline";
+    setTimeout(() => msg.style.display = "none", 1500);
+    showToast("question saved ✓");
+  } catch(e) { console.error(e); showToast("error saving — check connection"); }
+};
+
+window.deleteQuestion = async function(id) {
+  try { await deleteDoc(doc(db, "questions", id)); } catch(e) { console.error(e); }
+};
+
+// LOGS
+window.addLog = async function() {
+  const txt = document.getElementById("log-input").value.trim();
+  if (!txt) return;
+  try {
+    await addDoc(collection(db, "logs"), { text: txt, createdAt: serverTimestamp() });
+    document.getElementById("log-input").value = "";
+  } catch(e) { console.error(e); showToast("error saving log"); }
+};
+
+window.deleteLog = async function(id) {
+  try { await deleteDoc(doc(db, "logs", id)); } catch(e) { console.error(e); }
+};
+
+// RENDER
+window.renderLogs = function() {
+  const el = document.getElementById("log-list");
+  if (!logs.length) { el.innerHTML = ""; return; }
+  el.innerHTML = logs.map(l => `
+    <div class="log-entry">
+      <div class="log-time">${fmt(l.createdAt)}</div>
+      <div class="log-text">${escHtml(l.text)}</div>
+      <button class="del-btn" onclick="deleteLog('${l.id}')">delete</button>
+    </div>
+  `).join("");
+};
+
+window.renderQuestions = function() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const sec = document.getElementById("filter-section").value;
+  const st = document.getElementById("filter-status").value;
+  const filtered = questions.filter(q => {
+    if (sec !== "All" && q.section !== sec) return false;
+    if (st !== "All" && q.status !== st) return false;
+    if (search && !q.questionText?.toLowerCase().includes(search) && !q.notes?.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  const el = document.getElementById("q-list");
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty">${questions.length === 0 ? "no questions yet — hit + question to add one" : "no results"}</div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(q => `
+    <div class="card">
+      <div class="q-header">
+        <div style="flex:1">
+          <div class="badges">
+            <span class="badge badge-default">${escHtml(q.section)}</span>
+            <span class="badge badge-default">${escHtml(q.topic)}</span>
+            <span class="badge badge-default">${escHtml(q.difficulty)}</span>
+            <span class="badge badge-${STATUS_CLASS[q.status]}">${escHtml(q.status)}</span>
+          </div>
+          <div class="q-text">${escHtml(q.questionText)}</div>
+          ${q.notes ? `<div class="q-notes">${escHtml(q.notes)}</div>` : ""}
+          ${q.source ? `<div class="q-meta">source: ${escHtml(q.source)}</div>` : ""}
+          <div class="q-meta">${fmt(q.createdAt)}</div>
+        </div>
+        <button class="del-btn" onclick="deleteQuestion('${q.id}')">✕</button>
+      </div>
+    </div>
+  `).join("");
+};
+
+window.renderStats = function() {
+  const total = questions.length;
+  const correct = questions.filter(q => q.status === "Correct").length;
+  const incorrect = questions.filter(q => q.status === "Incorrect").length;
+  const review = questions.filter(q => q.status === "Review Later").length;
+  const acc = getAccuracy();
+  document.getElementById("stat-grid").innerHTML = [
+    {label:"total",val:total},{label:"correct",val:correct},
+    {label:"incorrect",val:incorrect},{label:"accuracy",val:acc+"%"},
+    {label:"review later",val:review}
+  ].map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-val">${s.val}</div></div>`).join("");
+  document.getElementById("section-stats").innerHTML = ["Quant","Verbal","AWA"].map(sec => {
+    const cnt = questions.filter(q => q.section === sec).length;
+    const cor = questions.filter(q => q.section === sec && q.status === "Correct").length;
+    const a = cnt > 0 ? Math.round(cor/cnt*100) : 0;
+    return `<div class="section-row"><span style="font-weight:500">${sec}</span><span style="font-size:13px;color:var(--text2)">${cnt} ques · ${a}% correct</span></div>`;
+  }).join("");
+};
+
+// UI helpers
+window.switchTab = function(t) {
+  ["log","add","stats"].forEach((x,i) => {
+    document.getElementById("tab-"+x).style.display = x===t?"block":"none";
+    document.querySelectorAll(".tab")[i].classList.toggle("active", x===t);
+  });
+  if (t === "stats") renderStats();
+};
+
+window.updateTopics = function() {
+  const sec = document.getElementById("f-section").value;
+  const sel = document.getElementById("f-topic");
+  sel.innerHTML = TOPICS[sec].map(t => `<option>${t}</option>`).join("");
+};
+
+window.clearForm = function() {
+  document.getElementById("f-qtext").value = "";
+  document.getElementById("f-notes").value = "";
+  document.getElementById("f-source").value = "";
+};
+
+document.getElementById("log-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addLog();
+});
+
+updateTopics();
+</script>
+</body>
+</html>
